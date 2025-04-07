@@ -104,7 +104,32 @@ def detect_display_info(image):
     cv2.imshow("Thresh", thresh)
 
 
-def show_board_info(frame, low_lights, high_lights):
+def detect_blinkers_from_beacon(image):
+    x, y, w, h = mark_beacon_section()
+    roi = image[y:y+h, x:x+w]
+    hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
+    lower_green = np.array([35, 50, 50])
+    upper_green = np.array([85, 255, 255])
+    mask = cv2.inRange(hsv, lower_green, upper_green)
+
+    mid = w // 2
+    left_mask = mask[:, :mid]
+    right_mask = mask[:, mid:]
+
+    left_on = cv2.countNonZero(left_mask) > 500
+    right_on = cv2.countNonZero(right_mask) > 500
+
+    if left_on and right_on:
+        return "Balizas encendidas"
+    elif left_on:
+        return "Luz de giro izquierda encendida"
+    elif right_on:
+        return "Luz de giro derecha encendida"
+    else:
+        return ""
+
+
+def show_board_info(frame, low_lights, high_lights, blinkers):
     low_lights_str = "Luces bajas: %s" % ("ON" if low_lights else "OFF")
     high_lights_str = "Luces altas: %s" % ("ON" if high_lights else "OFF")
 
@@ -114,6 +139,10 @@ def show_board_info(frame, low_lights, high_lights):
     )
     cv2.putText(
         frame, high_lights_str, (20, 80),
+        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2
+    )
+    cv2.putText(
+        frame, blinkers, (20, 120),
         cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2
     )
 
@@ -130,7 +159,8 @@ while video.isOpened():
     frame = set_important_sections(frame)
     low_lights = detect_low_lights(frame)
     high_lights = detect_high_lights(frame)
-    show_board_info(frame, low_lights, high_lights)
+    blinker_state = detect_blinkers_from_beacon(frame)
+    show_board_info(frame, low_lights, high_lights, blinker_state)
 
     current_time = time.time()
     if current_time - prev_time >= 1:
